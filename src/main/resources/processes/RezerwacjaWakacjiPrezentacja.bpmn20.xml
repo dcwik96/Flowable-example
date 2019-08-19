@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:flowable="http://flowable.org/bpmn" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" typeLanguage="http://www.w3.org/2001/XMLSchema" expressionLanguage="http://www.w3.org/1999/XPath" targetNamespace="http://www.flowable.org/processdef">
+  <message id="startProcessId" name="startProcessName"></message>
+  <process id="rezerwacjaWakacji" name="RezerwacjaWakacjiPrezentacja" isExecutable="true">
+    <sequenceFlow id="sid-D27FB5CA-3889-4973-B15D-F1953776FBFA" sourceRef="startevent_rezerwacja" targetRef="endevent_pozytywny_koniec"></sequenceFlow>
+    <startEvent id="startevent_rezerwacja" name="Start procesu rezerwacji" isInterrupting="true">
+      <messageEventDefinition messageRef="startProcessId"></messageEventDefinition>
+    </startEvent>
+    <subProcess id="endevent_pozytywny_koniec" name="subProcess" flowable:async="true" flowable:exclusive="false">
+      <startEvent id="startevent_subproces">
+        <extensionElements>
+          <flowable:executionListener event="start" delegateExpression="${ELStartSubProcessStartEvent}"></flowable:executionListener>
+        </extensionElements>
+      </startEvent>
+      <serviceTask id="st_zarezerwuj_wakacje" name="Zarezerwuj wakacje" flowable:delegateExpression="${STZarezerwujWakacje}"></serviceTask>
+      <serviceTask id="st_zrealizuj_platnosc" name="Zrealizuj platnosc" flowable:delegateExpression="${STZrealizujPlatnosc}"></serviceTask>
+      <boundaryEvent id="boundary_compensation_zarezerwuj" attachedToRef="st_zarezerwuj_wakacje" cancelActivity="false">
+        <compensateEventDefinition></compensateEventDefinition>
+      </boundaryEvent>
+      <serviceTask id="st_usun_rezerwacje" name="Usun rezerwacje" isForCompensation="true" flowable:delegateExpression="${STUsunRezerwacje}"></serviceTask>
+      <serviceTask id="st_przygotowanie_umowy" name="Przygotowanie umowy" flowable:delegateExpression="${STPrzygotowanieUmowy}"></serviceTask>
+      <endEvent id="sid-A577F82F-B81C-49DD-9401-06228CC0F62E" name="Pozytywny koniec"></endEvent>
+      <serviceTask id="sid-59A14C22-A36A-4F10-BB07-06E7DF6BA1FC" name="Cofnij platnosc" isForCompensation="true" flowable:delegateExpression="${STCofnijPlatnosc}"></serviceTask>
+      <serviceTask id="mailtask_poinformuj_o_bledzie" name="Poinformuj o bledzie" flowable:async="true" flowable:exclusive="false" flowable:type="mail">
+        <extensionElements>
+          <flowable:field name="to">
+            <flowable:string><![CDATA[dawid.cwik@asseco.pl]]></flowable:string>
+          </flowable:field>
+          <flowable:field name="subject">
+            <flowable:string><![CDATA[Informacja o bledzie]]></flowable:string>
+          </flowable:field>
+          <flowable:field name="text">
+            <flowable:expression><![CDATA[Wystapil blad podczas realizowania zamowienia.
+${informacja}]]></flowable:expression>
+          </flowable:field>
+        </extensionElements>
+      </serviceTask>
+      <intermediateThrowEvent id="throw_compensation_event"><compensateEventDefinition /></intermediateThrowEvent>
+      <endEvent id="endevent_anuluj_zamowienie" name="Anuluj zamowienie">
+        <extensionElements>
+          <flowable:executionListener event="start" delegateExpression="${ELStartAnulujZamowienieEndErrorEvent}"></flowable:executionListener>
+        </extensionElements>
+        <errorEventDefinition></errorEventDefinition>
+      </endEvent>
+      <boundaryEvent id="boundary_error_platnosc" name="Wystapil blad" attachedToRef="st_zrealizuj_platnosc">
+        <errorEventDefinition></errorEventDefinition>
+      </boundaryEvent>
+      <exclusiveGateway id="sid-B654760D-BB4A-482D-ACF7-208DA042BCC3" name="Poprawna rezerwacja"></exclusiveGateway>
+      <boundaryEvent id="boundary_compensation_platnosc" attachedToRef="st_zrealizuj_platnosc" cancelActivity="false">
+        <compensateEventDefinition></compensateEventDefinition>
+      </boundaryEvent>
+      <sequenceFlow id="sid-0458BC67-F7E4-4F71-B471-FDF76AE99FFE" sourceRef="startevent_subproces" targetRef="st_zarezerwuj_wakacje"></sequenceFlow>
+      <sequenceFlow id="sid-A1E8EC1A-EE11-4EF0-816A-27063AC2587B" sourceRef="st_zarezerwuj_wakacje" targetRef="sid-B654760D-BB4A-482D-ACF7-208DA042BCC3"></sequenceFlow>
+      <sequenceFlow id="sid-1BE30DC2-2439-45B1-9648-FDD18484FEE7" sourceRef="st_zrealizuj_platnosc" targetRef="st_przygotowanie_umowy"></sequenceFlow>
+      <sequenceFlow id="sid-816C7FE3-F57B-4F15-B8CD-60F87C65144E" sourceRef="st_przygotowanie_umowy" targetRef="sid-A577F82F-B81C-49DD-9401-06228CC0F62E"></sequenceFlow>
+      <sequenceFlow id="sid-B148E979-9BF8-4F9B-99BC-A037E3E8C1FD" sourceRef="boundary_error_platnosc" targetRef="mailtask_poinformuj_o_bledzie"></sequenceFlow>
+      <sequenceFlow id="sid-140AD3F0-EE62-4993-A010-5F7EFD4209DB" sourceRef="mailtask_poinformuj_o_bledzie" targetRef="throw_compensation_event"></sequenceFlow>
+      <sequenceFlow id="sid-2F2AFF83-7C5F-4E80-BC1F-44679647AF32" sourceRef="throw_compensation_event" targetRef="endevent_anuluj_zamowienie"></sequenceFlow>
+      <sequenceFlow id="sid-A1AD0839-D4E6-47C7-9658-32B022B4141D" sourceRef="sid-B654760D-BB4A-482D-ACF7-208DA042BCC3" targetRef="mailtask_poinformuj_o_bledzie">
+        <conditionExpression xsi:type="tFormalExpression"><![CDATA[${rejestracjaPoprawna == false}]]></conditionExpression>
+      </sequenceFlow>
+      <sequenceFlow id="sid-AA786590-81AE-4A8B-8CCB-BE1DD9AD68C7" sourceRef="sid-B654760D-BB4A-482D-ACF7-208DA042BCC3" targetRef="st_zrealizuj_platnosc">
+        <conditionExpression xsi:type="tFormalExpression"><![CDATA[${rejestracjaPoprawna == true}]]></conditionExpression>
+      </sequenceFlow>
+    </subProcess>
+    <boundaryEvent id="boundary_error_subprocess" name="Anulowanie zamowienia" attachedToRef="endevent_pozytywny_koniec">
+      <errorEventDefinition></errorEventDefinition>
+    </boundaryEvent>
+    <endEvent id="endevent_negatywny_koniec" name="Negatywny koniec"></endEvent>
+    <sequenceFlow id="sid-BE26176B-1C54-4604-BE93-956A0C1C93AE" sourceRef="boundary_error_subprocess" targetRef="endevent_negatywny_koniec"></sequenceFlow>
+    <userTask id="usertask_weryfikacja_zamowienia" name="Weryfikacja zamowienia">
+      <extensionElements>
+        <flowable:taskListener event="create" delegateExpression="${TLCreateWeryfikacjaZamowienia}"></flowable:taskListener>
+        <flowable:taskListener event="complete" delegateExpression="${TLCompleteWeryfikacjaZamowienia}"></flowable:taskListener>
+      </extensionElements>
+    </userTask>
+    <sequenceFlow id="sid-636626B8-C2ED-451C-99D3-7AF4354096C2" sourceRef="endevent_pozytywny_koniec" targetRef="usertask_weryfikacja_zamowienia"></sequenceFlow>
+    <endEvent id="endevent_koniec_procesu" name="Koniec">
+      <extensionElements>
+        <flowable:executionListener event="end" delegateExpression="${ELEndProcessEndEvent}"></flowable:executionListener>
+      </extensionElements>
+    </endEvent>
+    <sequenceFlow id="sid-F1473EEF-12D9-49BF-88B7-97DF5845C326" sourceRef="usertask_weryfikacja_zamowienia" targetRef="endevent_koniec_procesu"></sequenceFlow>
+    <association id="sid-FBF6A41C-1A25-45E9-B968-002D966D48A7" sourceRef="boundary_compensation_zarezerwuj" targetRef="st_usun_rezerwacje" associationDirection="None"></association>
+    <association id="sid-7533E440-3446-4CCE-8C01-1F6894ED5A58" sourceRef="boundary_compensation_platnosc" targetRef="sid-59A14C22-A36A-4F10-BB07-06E7DF6BA1FC" associationDirection="None"></association>
+  </process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_rezerwacjaWakacji">
+    <bpmndi:BPMNPlane bpmnElement="rezerwacjaWakacji" id="BPMNPlane_rezerwacjaWakacji">
+      <bpmndi:BPMNShape bpmnElement="startevent_rezerwacja" id="BPMNShape_startevent_rezerwacja">
+        <omgdc:Bounds height="30.0" width="30.5" x="166.66667108182565" y="266.66667373092105"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="endevent_pozytywny_koniec" id="BPMNShape_endevent_pozytywny_koniec">
+        <omgdc:Bounds height="416.32222046179186" width="949.2765431499438" x="285.0" y="181.0"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="startevent_subproces" id="BPMNShape_startevent_subproces">
+        <omgdc:Bounds height="30.0" width="30.0" x="329.5" y="218.0"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="st_zarezerwuj_wakacje" id="BPMNShape_st_zarezerwuj_wakacje">
+        <omgdc:Bounds height="80.0" width="100.0" x="450.0" y="193.0"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="st_zrealizuj_platnosc" id="BPMNShape_st_zrealizuj_platnosc">
+        <omgdc:Bounds height="80.0" width="100.0" x="783.2711205359591" y="193.0"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="boundary_compensation_zarezerwuj" id="BPMNShape_boundary_compensation_zarezerwuj">
+        <omgdc:Bounds height="30.0" width="30.0" x="481.63521623889625" y="258.3774051332449"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="st_usun_rezerwacje" id="BPMNShape_st_usun_rezerwacje">
+        <omgdc:Bounds height="80.0" width="100.0" x="483.3333461372944" y="326.5"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="st_przygotowanie_umowy" id="BPMNShape_st_przygotowanie_umowy">
+        <omgdc:Bounds height="80.0" width="109.76200019693374" x="950.0000251664062" y="193.0"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="sid-A577F82F-B81C-49DD-9401-06228CC0F62E" id="BPMNShape_sid-A577F82F-B81C-49DD-9401-06228CC0F62E">
+        <omgdc:Bounds height="28.0" width="28.0" x="1133.3333633564146" y="219.0"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="sid-59A14C22-A36A-4F10-BB07-06E7DF6BA1FC" id="BPMNShape_sid-59A14C22-A36A-4F10-BB07-06E7DF6BA1FC">
+        <omgdc:Bounds height="80.0" width="100.0" x="850.0000225173109" y="326.5"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="mailtask_poinformuj_o_bledzie" id="BPMNShape_mailtask_poinformuj_o_bledzie">
+        <omgdc:Bounds height="80.0" width="100.0" x="763.7832905817328" y="495.0"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="throw_compensation_event" id="BPMNShape_throw_compensation_event">
+        <omgdc:Bounds height="30.0" width="30.0" x="916.6666909500411" y="520.0"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="endevent_anuluj_zamowienie" id="BPMNShape_endevent_anuluj_zamowienie">
+        <omgdc:Bounds height="28.0" width="28.0" x="1000.0000264909539" y="521.0"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="boundary_error_platnosc" id="BPMNShape_boundary_error_platnosc">
+        <omgdc:Bounds height="30.0" width="30.0" x="798.7210570331113" y="258.41038158333237"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="sid-B654760D-BB4A-482D-ACF7-208DA042BCC3" id="BPMNShape_sid-B654760D-BB4A-482D-ACF7-208DA042BCC3">
+        <omgdc:Bounds height="40.0" width="40.0" x="600.0000158945724" y="213.0"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="boundary_compensation_platnosc" id="BPMNShape_boundary_compensation_platnosc">
+        <omgdc:Bounds height="30.0" width="30.0" x="837.7589504901854" y="258.7144989818644"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="sid-FBF6A41C-1A25-45E9-B968-002D966D48A7" id="BPMNShape_sid-FBF6A41C-1A25-45E9-B968-002D966D48A7">
+        <omgdc:Bounds height="38.88041027704429" width="15.322149784288058" x="502.1625317789891" y="287.40313252496287"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="sid-7533E440-3446-4CCE-8C01-1F6894ED5A58" id="BPMNShape_sid-7533E440-3446-4CCE-8C01-1F6894ED5A58">
+        <omgdc:Bounds height="38.81136787517312" width="19.76052944849596" x="859.8559460256856" y="287.65360447267034"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="boundary_error_subprocess" id="BPMNShape_boundary_error_subprocess">
+        <omgdc:Bounds height="30.0" width="30.0" x="1137.5139633744727" y="582.5909671546467"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="endevent_negatywny_koniec" id="BPMNShape_endevent_negatywny_koniec">
+        <omgdc:Bounds height="28.0" width="28.0" x="1138.513963374473" y="683.3333514354852"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="usertask_weryfikacja_zamowienia" id="BPMNShape_usertask_weryfikacja_zamowienia">
+        <omgdc:Bounds height="80.0" width="100.0" x="1279.2765431499438" y="349.16111023089593"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="endevent_koniec_procesu" id="BPMNShape_endevent_koniec_procesu">
+        <omgdc:Bounds height="28.0" width="28.0" x="1424.2765431499438" y="375.16111023089593"></omgdc:Bounds>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="sid-D27FB5CA-3889-4973-B15D-F1953776FBFA" id="BPMNEdge_sid-D27FB5CA-3889-4973-B15D-F1953776FBFA">
+        <omgdi:waypoint x="197.61460866421456" y="281.90785458180835"></omgdi:waypoint>
+        <omgdi:waypoint x="284.99999999999983" y="283.2721477002554"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="sid-1BE30DC2-2439-45B1-9648-FDD18484FEE7" id="BPMNEdge_sid-1BE30DC2-2439-45B1-9648-FDD18484FEE7">
+        <omgdi:waypoint x="883.2211205358747" y="233.0"></omgdi:waypoint>
+        <omgdi:waypoint x="950.0000251663517" y="233.0"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="sid-BE26176B-1C54-4604-BE93-956A0C1C93AE" id="BPMNEdge_sid-BE26176B-1C54-4604-BE93-956A0C1C93AE">
+        <omgdi:waypoint x="1152.5139633744727" y="612.5409653183465"></omgdi:waypoint>
+        <omgdi:waypoint x="1152.513963374473" y="683.3333514354852"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="sid-7533E440-3446-4CCE-8C01-1F6894ED5A58" id="BPMNEdge_sid-7533E440-3446-4CCE-8C01-1F6894ED5A58">
+        <omgdi:waypoint x="859.5435057642085" y="287.03851848920897"></omgdi:waypoint>
+        <omgdi:waypoint x="879.6343095519234" y="326.5"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="sid-F1473EEF-12D9-49BF-88B7-97DF5845C326" id="BPMNEdge_sid-F1473EEF-12D9-49BF-88B7-97DF5845C326">
+        <omgdi:waypoint x="1379.2265431499438" y="389.16111023089593"></omgdi:waypoint>
+        <omgdi:waypoint x="1424.2765431499438" y="389.16111023089593"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="sid-140AD3F0-EE62-4993-A010-5F7EFD4209DB" id="BPMNEdge_sid-140AD3F0-EE62-4993-A010-5F7EFD4209DB">
+        <omgdi:waypoint x="863.7332905815816" y="535.0"></omgdi:waypoint>
+        <omgdi:waypoint x="916.6666909500411" y="535.0"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="sid-A1E8EC1A-EE11-4EF0-816A-27063AC2587B" id="BPMNEdge_sid-A1E8EC1A-EE11-4EF0-816A-27063AC2587B">
+        <omgdi:waypoint x="549.9499999999896" y="233.2072613834495"></omgdi:waypoint>
+        <omgdi:waypoint x="600.4166825722716" y="233.41666667770454"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="sid-816C7FE3-F57B-4F15-B8CD-60F87C65144E" id="BPMNEdge_sid-816C7FE3-F57B-4F15-B8CD-60F87C65144E">
+        <omgdi:waypoint x="1059.71202536334" y="233.0"></omgdi:waypoint>
+        <omgdi:waypoint x="1133.3333633564146" y="233.0"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="sid-636626B8-C2ED-451C-99D3-7AF4354096C2" id="BPMNEdge_sid-636626B8-C2ED-451C-99D3-7AF4354096C2">
+        <omgdi:waypoint x="1234.2265431499438" y="389.16111023089593"></omgdi:waypoint>
+        <omgdi:waypoint x="1279.2765431499438" y="389.16111023089593"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="sid-0458BC67-F7E4-4F71-B471-FDF76AE99FFE" id="BPMNEdge_sid-0458BC67-F7E4-4F71-B471-FDF76AE99FFE">
+        <omgdi:waypoint x="359.449999244157" y="233.0"></omgdi:waypoint>
+        <omgdi:waypoint x="450.0" y="233.0"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="sid-AA786590-81AE-4A8B-8CCB-BE1DD9AD68C7" id="BPMNEdge_sid-AA786590-81AE-4A8B-8CCB-BE1DD9AD68C7">
+        <omgdi:waypoint x="639.4901696622613" y="233.45524591057247"></omgdi:waypoint>
+        <omgdi:waypoint x="783.2711205359591" y="233.11737966037305"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="sid-FBF6A41C-1A25-45E9-B968-002D966D48A7" id="BPMNEdge_sid-FBF6A41C-1A25-45E9-B968-002D966D48A7">
+        <omgdi:waypoint x="502.11796552235296" y="287.28849987830637"></omgdi:waypoint>
+        <omgdi:waypoint x="517.5699838938312" y="326.5"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="sid-2F2AFF83-7C5F-4E80-BC1F-44679647AF32" id="BPMNEdge_sid-2F2AFF83-7C5F-4E80-BC1F-44679647AF32">
+        <omgdi:waypoint x="946.616688255483" y="535.0"></omgdi:waypoint>
+        <omgdi:waypoint x="1000.0000264909539" y="535.0"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="sid-A1AD0839-D4E6-47C7-9658-32B022B4141D" id="BPMNEdge_sid-A1AD0839-D4E6-47C7-9658-32B022B4141D">
+        <omgdi:waypoint x="620.5000158945724" y="252.44685842175065"></omgdi:waypoint>
+        <omgdi:waypoint x="620.5000158945724" y="535.0"></omgdi:waypoint>
+        <omgdi:waypoint x="763.7832905817328" y="535.0"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="sid-B148E979-9BF8-4F9B-99BC-A037E3E8C1FD" id="BPMNEdge_sid-B148E979-9BF8-4F9B-99BC-A037E3E8C1FD">
+        <omgdi:waypoint x="813.724613635669" y="288.36038023735773"></omgdi:waypoint>
+        <omgdi:waypoint x="813.7737743709598" y="495.0"></omgdi:waypoint>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>
